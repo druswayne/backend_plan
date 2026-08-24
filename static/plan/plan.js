@@ -10,6 +10,8 @@ const state = {
   mode: "month",
   cursor: startOfToday(),
   events: [],
+  filterPerson: "",
+  hideRepik: false,
 };
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -79,8 +81,29 @@ function visibleRange() {
   return { from: day, to: day };
 }
 
+function isRepik(event) {
+  return String(event.source || "").toLowerCase() === "classhub" || String(event.title || "").toUpperCase() === "РЕПИК";
+}
+
+function visibleEvents() {
+  return state.events.filter((event) => {
+    if (state.hideRepik && isRepik(event)) return false;
+    if (state.filterPerson && String(event.author || "").toLowerCase() !== state.filterPerson.toLowerCase()) return false;
+    return true;
+  });
+}
+
+function peopleNames() {
+  const seen = new Map();
+  state.events.forEach((event) => {
+    const name = String(event.author || "").trim();
+    if (name) seen.set(name.toLowerCase(), name);
+  });
+  return [...seen.values()].sort((a, b) => a.localeCompare(b, "ru"));
+}
+
 function eventsOn(iso) {
-  return state.events.filter((e) => e.date === iso);
+  return visibleEvents().filter((e) => e.date === iso);
 }
 
 function minutesOf(time) {
@@ -212,9 +235,25 @@ function render() {
   document.querySelectorAll("#modes .chip").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.mode === state.mode);
   });
+  renderFilters();
   if (state.mode === "month") renderMonth();
   else if (state.mode === "day") renderDayAgenda();
   else renderWeekGrid();
+}
+
+function renderFilters() {
+  const select = $("#filter-person");
+  const hide = $("#hide-repik");
+  if (!select || !hide) return;
+  const names = peopleNames();
+  const current = state.filterPerson;
+  if (current && !names.some((name) => name.toLowerCase() === current.toLowerCase())) {
+    names.unshift(current);
+  }
+  select.innerHTML = `<option value="">Все</option>` + names
+    .map((name) => `<option value="${escapeHtml(name)}"${name.toLowerCase() === current.toLowerCase() ? " selected" : ""}>${escapeHtml(name)}</option>`)
+    .join("");
+  hide.checked = state.hideRepik;
 }
 
 function renderMonth() {
@@ -445,6 +484,14 @@ $("#modes").onclick = (ev) => {
   if (!btn) return;
   state.mode = btn.dataset.mode;
   loadAndRender();
+};
+$("#filter-person").onchange = () => {
+  state.filterPerson = $("#filter-person").value;
+  render();
+};
+$("#hide-repik").onchange = () => {
+  state.hideRepik = $("#hide-repik").checked;
+  render();
 };
 
 function minutesToTime(total) {
