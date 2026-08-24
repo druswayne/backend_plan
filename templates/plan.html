@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Совместное планирование</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/plan/plan.css" />
+</head>
+<body>
+  <div id="gate" class="gate"></div>
+  <div id="app" class="hidden">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">Пл</div>
+        <div>
+          <div class="brand-title">Планирование</div>
+          <div class="brand-sub">Общий календарь дел</div>
+        </div>
+      </div>
+      <div class="top-actions">
+        <span id="who" class="who"></span>
+        <button class="btn-outline" id="change-name">Сменить имя</button>
+        <button class="btn-outline" id="open-settings">Настройки</button>
+        <a class="btn-ghost" href="/">ClassHub</a>
+      </div>
+    </header>
+    <main class="content">
+      <div id="toast" class="toast hidden"></div>
+      <div class="toolbar">
+        <div class="row">
+          <button class="btn-outline" id="prev">←</button>
+          <h1 id="period-label"></h1>
+          <button class="btn-outline" id="next">→</button>
+          <button class="btn-ghost" id="today">Сегодня</button>
+        </div>
+        <div class="row">
+          <div class="chips" id="modes">
+            <button class="chip" data-mode="month">Месяц</button>
+            <button class="chip" data-mode="week">Неделя</button>
+            <button class="chip" data-mode="day">День</button>
+          </div>
+          <button class="btn-primary" id="add">+ Дело</button>
+        </div>
+      </div>
+      <div id="calendar"></div>
+    </main>
+  </div>
+  <div id="modal-root"></div>
+  <script src="/static/plan/plan.js"></script>
+</body>
+</html>

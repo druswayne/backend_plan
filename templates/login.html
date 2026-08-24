@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Вход — ClassHub</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/app.css" />
+</head>
+<body class="login-body">
+  <div class="login-card">
+    <div class="brand">
+      <div class="brand-mark">CH</div>
+      <div>
+        <div class="brand-title">ClassHub</div>
+        <div class="brand-sub">Вход на сайт</div>
+      </div>
+    </div>
+    {% if error %}
+    <div class="login-error">{{ error }}</div>
+    {% endif %}
+    <form method="post" action="/login" class="login-form">
+      <input type="hidden" name="next" value="{{ next }}" />
+      <label>Логин
+        <input type="text" name="username" value="{{ username or '' }}" autocomplete="username" required autofocus />
+      </label>
+      <label>Пароль
+        <input type="password" name="password" autocomplete="current-password" required />
+      </label>
+      <button class="btn-primary" type="submit">Войти</button>
+    </form>
+    <p class="muted login-hint">По умолчанию: логин <b>admin</b>, пароль <b>admin</b>. Смените их в настройках после входа.</p>
+  </div>
+</body>
+</html>
