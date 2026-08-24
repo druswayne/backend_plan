@@ -37,6 +37,7 @@ def _row_to_event(row) -> dict:
         "updatedAt": row["updated_at"],
         "source": "plan",
         "readonly": False,
+        "locationType": "",
     }
 
 
@@ -237,6 +238,7 @@ def _lesson_to_plan_event(lesson: dict) -> dict:
         place = "Онлайн"
     else:
         place = str(occ.get("address") or "").strip() or "Офлайн"
+        location = "OFFLINE"
     notes = str(occ.get("notes") or "").strip()
     grade = str(student.get("grade") or "").strip()
     duration = int(occ.get("durationMinutes") or 60)
@@ -264,6 +266,7 @@ def _lesson_to_plan_event(lesson: dict) -> dict:
         "updatedAt": "",
         "source": "classhub",
         "readonly": True,
+        "locationType": location,
     }
 
 

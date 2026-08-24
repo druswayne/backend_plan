@@ -85,6 +85,20 @@ function isRepik(event) {
   return String(event.source || "").toLowerCase() === "classhub" || String(event.title || "").toUpperCase() === "РЕПИК";
 }
 
+function eventColorClass(event) {
+  if (isRepik(event)) {
+    return isOnlineLesson(event) ? "repik-online" : "repik-offline";
+  }
+  return event.importance || "medium";
+}
+
+function isOnlineLesson(event) {
+  const loc = String(event.locationType || "").toUpperCase();
+  if (loc === "ONLINE") return true;
+  if (loc === "OFFLINE") return false;
+  return /формат:\s*онлайн/i.test(String(event.description || ""));
+}
+
 function visibleEvents() {
   return state.events.filter((event) => {
     if (state.hideRepik && isRepik(event)) return false;
@@ -271,7 +285,7 @@ function renderMonth() {
     const weekend = day.getDay() === 0 || day.getDay() === 6;
     const items = eventsOn(iso)
       .map((e) => `
-        <button class="month-item ${e.importance}" data-id="${e.id}">
+        <button class="month-item ${eventColorClass(e)}" data-id="${e.id}">
           <span class="month-time">${e.time}</span>
           <span class="month-who">${escapeHtml(e.title)} · ${escapeHtml(e.author)}</span>
         </button>`)
@@ -309,7 +323,7 @@ function renderDayAgenda() {
     const dur = e.durationMinutes || 60;
     const start = minutesOf(e.time);
     const preview = (e.description || "").split("\n").filter(Boolean)[0] || `${dur} мин`;
-    return `<button type="button" class="day-event ${e.importance}" data-id="${e.id}">
+    return `<button type="button" class="day-event ${eventColorClass(e)}" data-id="${e.id}">
       <div class="day-event-time"><b>${e.time}</b><span class="muted">${formatMinutes(start + dur)}</span></div>
       <div class="day-event-body">
         <b>${escapeHtml(e.title)}</b>
@@ -360,7 +374,7 @@ function renderWeekGrid() {
       const height = Math.max(((botMin - topMin) / 60) * HOUR_H, 18);
       const width = 100 / item.cols;
       const left = (item.col * 100) / item.cols;
-      return `<button type="button" class="hour-event ${item.event.importance}" data-id="${item.event.id}"
+      return `<button type="button" class="hour-event ${eventColorClass(item.event)}" data-id="${item.event.id}"
         style="top:${top + 1}px;height:${Math.max(height - 2, 16)}px;left:calc(${left}% + 1px);width:calc(${width}% - 2px)">
         ${escapeHtml(item.event.title)}<small>${escapeHtml(item.event.author)}</small>
       </button>`;
@@ -477,7 +491,7 @@ function shift(delta) {
 
 $("#prev").onclick = () => shift(-1);
 $("#next").onclick = () => shift(1);
-$("#today").onclick = () => { state.cursor = startOfToday(); loadAndRender(); };
+$("#today").onclick = () => { state.cursor = startOfToday(); state.mode = "day"; loadAndRender(); };
 $("#add").onclick = () => openEditor(null, isoDate(state.cursor));
 $("#change-name").onclick = () => showGate(true);
 $("#open-settings").onclick = () => openSettings();

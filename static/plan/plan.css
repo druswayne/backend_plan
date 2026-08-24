@@ -138,6 +138,8 @@ h1 { margin: 0; font-size: 22px; }
 .month-item.low { background: var(--low-bg); color: var(--low-fg); }
 .month-item.medium { background: var(--mid-bg); color: var(--mid-fg); }
 .month-item.high { background: var(--high-bg); color: var(--high-fg); }
+.month-item.repik-offline { background: #dbeafe; color: #1d4ed8; }
+.month-item.repik-online { background: #ffedd5; color: #c2410c; }
 .month-time { font-variant-numeric: tabular-nums; font-weight: 700; }
 .month-who { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -222,6 +224,8 @@ h1 { margin: 0; font-size: 22px; }
 .hour-event.low { background: var(--low-bg); color: var(--low-fg); }
 .hour-event.medium { background: var(--mid-bg); color: var(--mid-fg); }
 .hour-event.high { background: var(--high-bg); color: var(--high-fg); }
+.hour-event.repik-offline { background: #dbeafe; color: #1d4ed8; }
+.hour-event.repik-online { background: #ffedd5; color: #c2410c; }
 .hour-event small {
   font-weight: 600;
   font-size: 11px;
@@ -270,6 +274,8 @@ h1 { margin: 0; font-size: 22px; }
 .day-event.low { border-left: 4px solid #22c55e; }
 .day-event.medium { border-left: 4px solid #f59e0b; }
 .day-event.high { border-left: 4px solid #f43f5e; }
+.day-event.repik-offline { background: #dbeafe; border-left: 4px solid #3b82f6; color: #1d4ed8; }
+.day-event.repik-online { background: #ffedd5; border-left: 4px solid #fb923c; color: #c2410c; }
 @media (max-width: 640px) {
   .day-event { grid-template-columns: 64px 1fr; }
   .day-event-flags { grid-column: 2; justify-content: flex-start; }
