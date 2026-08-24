@@ -96,6 +96,7 @@ function visibleEvents() {
 function peopleNames() {
   const seen = new Map();
   state.events.forEach((event) => {
+    if (isRepik(event)) return;
     const name = String(event.author || "").trim();
     if (name) seen.set(name.toLowerCase(), name);
   });
@@ -242,18 +243,19 @@ function render() {
 }
 
 function renderFilters() {
-  const select = $("#filter-person");
-  const hide = $("#hide-repik");
-  if (!select || !hide) return;
-  const names = peopleNames();
-  const current = state.filterPerson;
-  if (current && !names.some((name) => name.toLowerCase() === current.toLowerCase())) {
-    names.unshift(current);
+  const root = $("#filters");
+  if (!root) return;
+  const current = (state.filterPerson || "").toLowerCase();
+  const people = peopleNames().map((name) => {
+    const active = name.toLowerCase() === current ? " active" : "";
+    return `<button class="chip${active}" data-person="${escapeHtml(name)}">${escapeHtml(name)}</button>`;
+  });
+  const hideActive = state.hideRepik ? " active" : "";
+  people.push(`<button class="chip${hideActive}" data-hide-repik="1">Скрыть репик</button>`);
+  if (state.filterPerson || state.hideRepik) {
+    people.push(`<button class="chip" data-clear-filters="1">Сбросить</button>`);
   }
-  select.innerHTML = `<option value="">Все</option>` + names
-    .map((name) => `<option value="${escapeHtml(name)}"${name.toLowerCase() === current.toLowerCase() ? " selected" : ""}>${escapeHtml(name)}</option>`)
-    .join("");
-  hide.checked = state.hideRepik;
+  root.innerHTML = people.join("");
 }
 
 function renderMonth() {
@@ -485,12 +487,24 @@ $("#modes").onclick = (ev) => {
   state.mode = btn.dataset.mode;
   loadAndRender();
 };
-$("#filter-person").onchange = () => {
-  state.filterPerson = $("#filter-person").value;
-  render();
-};
-$("#hide-repik").onchange = () => {
-  state.hideRepik = $("#hide-repik").checked;
+$("#filters").onclick = (ev) => {
+  const clear = ev.target.closest("[data-clear-filters]");
+  if (clear) {
+    state.filterPerson = "";
+    state.hideRepik = false;
+    render();
+    return;
+  }
+  const hide = ev.target.closest("[data-hide-repik]");
+  if (hide) {
+    state.hideRepik = !state.hideRepik;
+    render();
+    return;
+  }
+  const person = ev.target.closest("[data-person]");
+  if (!person) return;
+  const name = person.dataset.person || "";
+  state.filterPerson = state.filterPerson.toLowerCase() === name.toLowerCase() ? "" : name;
   render();
 };
 
