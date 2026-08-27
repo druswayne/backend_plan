@@ -418,7 +418,7 @@ function openEditor(id, presetDate) {
             <label>Время<input type="time" name="time" value="${timeValue}" required ${lock}></label>
           </div>
           <label>Длительность, мин
-            <input type="number" name="durationMinutes" min="15" max="1440" step="15" value="${existing?.durationMinutes || 60}" ${lock}>
+            <input type="number" name="durationMinutes" min="1" max="1440" inputmode="numeric" value="${existing?.durationMinutes || 60}" ${lock}>
           </label>
           <label>Описание<textarea name="description" ${lock}>${escapeHtml(existing?.description || "")}</textarea></label>
           <div>
@@ -468,7 +468,7 @@ function openEditor(id, presetDate) {
       description: form.description.value.trim(),
       date: form.date.value,
       time: form.time.value.slice(0, 5),
-      durationMinutes: Number(form.durationMinutes.value || 60),
+      durationMinutes: Math.min(1440, Math.max(15, Number(form.durationMinutes.value || 60))),
       importance: selectedImp,
       author: state.name,
     };
