@@ -879,6 +879,69 @@ def list_payments() -> list[dict]:
         return result
 
 
+def list_unpaid_students() -> list[dict]:
+    with db_cursor() as conn:
+        rows = [
+            dict(r)
+            for r in conn.execute(
+                """
+                SELECT lo.*, ss.name AS subjectName
+                FROM lesson_occurrences lo
+                LEFT JOIN student_subjects ss ON ss.id = lo.studentSubjectId
+                WHERE lo.status = ?
+                  AND (lo.price - lo.paidAmount) > 0.001
+                ORDER BY lo.dateEpochDay ASC, lo.startTimeMinutes ASC
+                """,
+                (STATUS_CONDUCTED,),
+            )
+        ]
+        if not rows:
+            return []
+        student_ids = sorted({int(r["studentId"]) for r in rows})
+        placeholders = ",".join("?" * len(student_ids))
+        students = [
+            dict(r)
+            for r in conn.execute(
+                f"SELECT * FROM students WHERE id IN ({placeholders})",
+                student_ids,
+            )
+        ]
+        subjects = [dict(r) for r in conn.execute("SELECT * FROM student_subjects")]
+        student_map = {s["id"]: s for s in with_subjects(students, subjects)}
+        grouped: dict[int, list[dict]] = {}
+        for occ in rows:
+            grouped.setdefault(int(occ["studentId"]), []).append(occ)
+        result = []
+        for student_id, lessons in grouped.items():
+            student = student_map.get(student_id)
+            if student is None:
+                continue
+            unpaid_amount = sum(max(float(lesson["price"]) - float(lesson["paidAmount"]), 0.0) for lesson in lessons)
+            result.append(
+                {
+                    "student": student,
+                    "unpaidAmount": unpaid_amount,
+                    "unpaidLessonsCount": len(lessons),
+                    "oldestUnpaidDateEpochDay": min(int(lesson["dateEpochDay"]) for lesson in lessons),
+                    "lessons": [
+                        {
+                            "id": lesson["id"],
+                            "dateEpochDay": lesson["dateEpochDay"],
+                            "startTimeMinutes": lesson["startTimeMinutes"],
+                            "durationMinutes": lesson["durationMinutes"],
+                            "price": lesson["price"],
+                            "paidAmount": lesson["paidAmount"],
+                            "unpaidAmount": max(float(lesson["price"]) - float(lesson["paidAmount"]), 0.0),
+                            "subjectName": (str(lesson.get("subjectName") or "").strip() or "Предмет"),
+                        }
+                        for lesson in lessons
+                    ],
+                }
+            )
+        result.sort(key=lambda item: (-item["unpaidAmount"], item["student"]["name"].lower()))
+        return result
+
+
 def student_detail(student_id: int, month_iso: str | None = None) -> dict:
     anchor = parse_iso_date(month_iso) if month_iso else today()
     month_from, month_to = month_bounds(anchor)
@@ -999,14 +1062,14 @@ def get_settings() -> dict:
         row = as_dict(conn.execute("SELECT * FROM app_settings WHERE id = 1").fetchone())
         if row is None:
             raise AppError("Настройки не найдены", 404)
-        extra = [
-            item.strip()
-            for item in str(row["dailyScheduleExtraChatIds"]).replace(",", "\n").replace(";", "\n").split("\n")
-            if item.strip()
-        ]
+        main = str(row.get("telegramChatId") or "").strip()
+        extra = []
+        for item in str(row["dailyScheduleExtraChatIds"] or "").replace(",", "\n").replace(";", "\n").split("\n"):
+            value = item.strip()
+            if value and value != main and value not in extra:
+                extra.append(value)
         row["notificationsEnabled"] = bool(row["notificationsEnabled"])
         row["dailyScheduleEnabled"] = bool(row["dailyScheduleEnabled"])
-        row["extraChatIds"] = extra
         row["extraChatIds"] = extra
         return row
 
@@ -1023,9 +1086,19 @@ def update_settings(payload: dict) -> dict:
     if extra is None:
         extra = current.get("extraChatIds")
     if extra is not None:
-        current["dailyScheduleExtraChatIds"] = "\n".join(
-            dict.fromkeys(str(item).strip() for item in extra if str(item).strip())
-        )
+        if isinstance(extra, str):
+            items = extra.replace(",", "\n").replace(";", "\n").split("\n")
+        elif isinstance(extra, (list, tuple, set)):
+            items = extra
+        else:
+            items = [extra]
+        main = str(current.get("telegramChatId") or "").strip()
+        seen: list[str] = []
+        for item in items:
+            value = str(item).strip()
+            if value and value != main and value not in seen:
+                seen.append(value)
+        current["dailyScheduleExtraChatIds"] = "\n".join(seen)
     minutes = max(int(current.get("globalReminderMinutes") or 30), 1)
     daily = min(max(int(current.get("dailyScheduleMinutes") or 420), 0), 23 * 60 + 59)
     with db_cursor(transaction=True) as conn:
@@ -1195,6 +1268,7 @@ _bind_aliases(
     ("journal_summaries", "journal_summaries"),
     ("student_journal", "student_journal"),
     ("list_payments", "list_payments"),
+    ("list_unpaid_students", "list_unpaid_students"),
     ("process_payment", "process_payment"),
     ("get_settings", "get_settings"),
     ("update_settings", "update_settings"),

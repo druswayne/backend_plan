@@ -96,6 +96,8 @@ label { display: grid; gap: 6px; font-size: 13px; font-weight: 600; color: var(-
 .chip.low { background: var(--low-bg); color: var(--low-fg); }
 .chip.medium { background: var(--mid-bg); color: var(--mid-fg); }
 .chip.high { background: var(--high-bg); color: var(--high-fg); }
+.chip.repik-offline { background: #dbeafe; color: #1d4ed8; }
+.chip.repik-online { background: #f3e8ff; color: #7e22ce; }
 .chip.active { background: var(--indigo-100); color: var(--indigo-700); }
 h1 { margin: 0; font-size: 22px; }
 

@@ -353,6 +353,11 @@ def api_payments():
     return jsonify(service.list_payments())
 
 
+@app.get("/api/payments/unpaid")
+def api_unpaid_students():
+    return jsonify(service.list_unpaid_students())
+
+
 @app.post("/api/payments")
 def api_add_payment():
     data = request.get_json(force=True, silent=True) or {}

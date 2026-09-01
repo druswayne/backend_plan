@@ -126,6 +126,14 @@ function val(id) {
   return document.getElementById(id)?.value;
 }
 
+function pluralRu(n, one, few, many) {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
+  return many;
+}
+
 function openModal(html) {
   $("#modal-root").innerHTML = `<div class="modal-backdrop"><div class="modal">${html}</div></div>`;
   $(".modal-backdrop").addEventListener("click", (e) => {
@@ -588,9 +596,60 @@ async function renderLesson() {
   };
 }
 
+let paymentsTab = "unpaid";
+
 async function renderPayments() {
-  const list = await api("/api/payments");
-  $("#app").innerHTML = `<div class="page"><h2>Платежи</h2>${list.length ? list.map((i) => `<div class="card row space"><div><b>${i.student?.name || "Ученик"}</b><div>${money(i.payment.amount)}</div><div class="muted">${new Date(i.payment.createdAt).toLocaleString("ru")} ${i.payment.note || ""}</div></div><button class="btn-danger" data-delpay="${i.payment.id}">Удалить</button></div>`).join("") : `<div class="card empty">Платежей пока нет</div>`}</div>`;
+  const [list, unpaid] = await Promise.all([api("/api/payments"), api("/api/payments/unpaid")]);
+  const unpaidTotal = unpaid.reduce((sum, item) => sum + Number(item.unpaidAmount || 0), 0);
+  const unpaidTabLabel = unpaid.length ? `К оплате (${unpaid.length})` : "К оплате";
+  const unpaidHtml = unpaid.length
+    ? `<div class="card">
+        <div class="muted">К оплате</div>
+        <div class="stat amount-due">${money(unpaidTotal)}</div>
+        <div class="muted">${unpaid.length} ${pluralRu(unpaid.length, "ученик", "ученика", "учеников")} с неоплаченными занятиями</div>
+      </div>` +
+      unpaid.map((item) => {
+        const student = item.student || {};
+        const count = item.unpaidLessonsCount || (item.lessons || []).length;
+        const lessons = (item.lessons || []).map((lesson) =>
+          `<div class="unpaid-lesson clickable" data-open="${lesson.id}">
+            <div>
+              <b>${fmtDate(lesson.dateEpochDay)}</b>
+              <div class="muted">${lesson.subjectName || "Предмет"} · ${fmtTime(lesson.startTimeMinutes)}</div>
+            </div>
+            <span class="amount-due">${money(lesson.unpaidAmount)}</span>
+          </div>`
+        ).join("");
+        return `<div class="card unpaid-card">
+          <div class="row space clickable unpaid-student" data-student="${student.id}">
+            ${avatar(student.name)}
+            <div class="unpaid-student-info">
+              <b>${student.name || "Ученик"}</b>${student.isArchived ? ' <span class="muted">архив</span>' : ""}
+              <div class="muted">${count} ${pluralRu(count, "занятие", "занятия", "занятий")} не оплачено</div>
+            </div>
+            <b class="amount-due">${money(item.unpaidAmount)}</b>
+          </div>
+          ${lessons}
+        </div>`;
+      }).join("")
+    : `<div class="card empty">Нет неоплаченных занятий</div>`;
+  const historyHtml = list.length
+    ? list.map((i) => `<div class="card row space"><div class="row">${avatar(i.student?.name || "Ученик")}<div><b>${i.student?.name || "Ученик"}</b><div class="amount-paid">${money(i.payment.amount)}</div><div class="muted">${new Date(i.payment.createdAt).toLocaleString("ru")} ${i.payment.note || ""}</div></div></div><button class="btn-danger" data-delpay="${i.payment.id}">Удалить</button></div>`).join("")
+    : `<div class="card empty">Платежей пока нет</div>`;
+  $("#app").innerHTML = `<div class="page">
+    <h2>Платежи</h2>
+    <div class="chips">
+      <span class="chip ${paymentsTab === "unpaid" ? "active" : ""}" data-paytab="unpaid">${unpaidTabLabel}</span>
+      <span class="chip ${paymentsTab === "history" ? "active" : ""}" data-paytab="history">История</span>
+    </div>
+    ${paymentsTab === "unpaid" ? unpaidHtml : historyHtml}
+  </div>`;
+  document.querySelectorAll("[data-paytab]").forEach((el) => {
+    el.onclick = () => {
+      paymentsTab = el.dataset.paytab;
+      render();
+    };
+  });
 }
 
 async function renderSettings() {
@@ -711,9 +770,15 @@ document.addEventListener("click", async (e) => {
     return;
   }
   const open = e.target.closest("[data-open]");
-  if (open) location.hash = `#/lesson/${open.dataset.open}`;
+  if (open) {
+    location.hash = `#/lesson/${open.dataset.open}`;
+    return;
+  }
   const st = e.target.closest("[data-student]");
-  if (st) location.hash = `#/student/${st.dataset.student}`;
+  if (st) {
+    location.hash = `#/student/${st.dataset.student}`;
+    return;
+  }
   const j = e.target.closest("[data-journal]");
   if (j) location.hash = `#/journal/${j.dataset.journal}`;
   const en = e.target.closest("[data-entry]");

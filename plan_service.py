@@ -228,11 +228,6 @@ def _lesson_to_plan_event(lesson: dict) -> dict:
     occ = lesson["occurrence"]
     student = lesson.get("student") or {}
     status = occ.get("status") or "EXPECTED"
-    status_label = {
-        "EXPECTED": "Ожидается",
-        "CONDUCTED": "Проведено",
-        "CANCELLED": "Отменено",
-    }.get(status, status)
     location = occ.get("locationType") or ""
     if location == "ONLINE":
         place = "Онлайн"
@@ -248,7 +243,6 @@ def _lesson_to_plan_event(lesson: dict) -> dict:
     lines.append(f"Предмет: {lesson.get('subjectName') or 'Предмет'}")
     lines.append(f"Формат: {place}")
     lines.append(f"Длительность: {duration} мин")
-    lines.append(f"Статус: {status_label}")
     if notes:
         lines.append(f"Заметки: {notes}")
     import service
@@ -260,13 +254,14 @@ def _lesson_to_plan_event(lesson: dict) -> dict:
         "date": day.isoformat(),
         "time": _minutes_to_time(occ.get("startTimeMinutes") or 0),
         "durationMinutes": max(15, duration),
-        "importance": "high",
+        "importance": None,
         "author": student.get("name") or "ClassHub",
         "createdAt": "",
         "updatedAt": "",
         "source": "classhub",
         "readonly": True,
         "locationType": location,
+        "cancelled": status == "CANCELLED",
     }
 
 
@@ -403,6 +398,8 @@ def update_settings(data: dict) -> dict:
 def is_cancelled_event(event: dict) -> bool:
     if event.get("source") != "classhub":
         return False
+    if "cancelled" in event:
+        return bool(event.get("cancelled"))
     return "Статус: Отменено" in (event.get("description") or "")
 
 

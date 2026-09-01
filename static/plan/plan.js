@@ -92,6 +92,14 @@ function eventColorClass(event) {
   return event.importance || "medium";
 }
 
+function eventFlags(event) {
+  if (isRepik(event)) {
+    const online = isOnlineLesson(event);
+    return `<span class="chip ${online ? "repik-online" : "repik-offline"}">${online ? "Онлайн" : "Офлайн"}</span>`;
+  }
+  return `<span class="chip ${event.importance}">${IMPORTANCE_LABEL[event.importance] || event.importance}</span>`;
+}
+
 function isOnlineLesson(event) {
   const loc = String(event.locationType || "").toUpperCase();
   if (loc === "ONLINE") return true;
@@ -329,7 +337,7 @@ function renderDayAgenda() {
         <b>${escapeHtml(e.title)}</b>
         <div class="muted">${escapeHtml(e.author)} · ${escapeHtml(preview)}</div>
       </div>
-      <div class="day-event-flags"><span class="chip ${e.importance}">${IMPORTANCE_LABEL[e.importance] || e.importance}</span></div>
+      <div class="day-event-flags">${eventFlags(e)}</div>
     </button>`;
   }).join("");
   $("#calendar").innerHTML = `<div class="day-agenda">
@@ -421,14 +429,14 @@ function openEditor(id, presetDate) {
             <input type="number" name="durationMinutes" min="1" max="1440" inputmode="numeric" value="${existing?.durationMinutes || 60}" ${lock}>
           </label>
           <label>Описание<textarea name="description" ${lock}>${escapeHtml(existing?.description || "")}</textarea></label>
-          <div>
+          ${readonly ? "" : `<div>
             <div class="muted" style="font-size:13px;font-weight:600;margin-bottom:6px">Важность</div>
             <div class="importance-row" id="imp">
               ${["low", "medium", "high"].map((key) => `
-                <button type="button" class="chip ${importance === key ? "active" : ""}" data-imp="${key}" ${lock}>${IMPORTANCE_LABEL[key]}</button>
+                <button type="button" class="chip ${importance === key ? "active" : ""}" data-imp="${key}">${IMPORTANCE_LABEL[key]}</button>
               `).join("")}
             </div>
-          </div>
+          </div>`}
           ${existing ? `<div style="color:var(--muted);font-size:13px">${readonly ? "Ученик" : "Добавил"}: <b>${escapeHtml(existing.author)}</b></div>` : ""}
         </div>
         <div class="row" style="justify-content:space-between;margin-top:8px">
