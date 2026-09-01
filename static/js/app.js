@@ -597,6 +597,7 @@ async function renderLesson() {
 }
 
 let paymentsTab = "unpaid";
+const paymentsExpanded = new Set();
 
 async function renderPayments() {
   const [list, unpaid] = await Promise.all([api("/api/payments"), api("/api/payments/unpaid")]);
@@ -620,16 +621,21 @@ async function renderPayments() {
             <span class="amount-due">${money(lesson.unpaidAmount)}</span>
           </div>`
         ).join("");
-        return `<div class="card unpaid-card">
-          <div class="row space clickable unpaid-student" data-student="${student.id}">
-            ${avatar(student.name)}
-            <div class="unpaid-student-info">
-              <b>${student.name || "Ученик"}</b>${student.isArchived ? ' <span class="muted">архив</span>' : ""}
-              <div class="muted">${count} ${pluralRu(count, "занятие", "занятия", "занятий")} не оплачено</div>
+        const expanded = paymentsExpanded.has(String(student.id));
+        return `<div class="card unpaid-card${expanded ? " expanded" : ""}" data-unpaid-card="${student.id}">
+          <div class="row space unpaid-student">
+            <div class="row clickable unpaid-student-main" data-unpaid-toggle="${student.id}">
+              ${avatar(student.name)}
+              <div class="unpaid-student-info">
+                <b>${student.name || "Ученик"}</b>${student.isArchived ? ' <span class="muted">архив</span>' : ""}
+                <div class="muted">${count} ${pluralRu(count, "занятие", "занятия", "занятий")} не оплачено</div>
+              </div>
             </div>
             <b class="amount-due">${money(item.unpaidAmount)}</b>
+            <button type="button" class="btn-icon unpaid-toggle" data-unpaid-toggle="${student.id}" aria-expanded="${expanded ? "true" : "false"}" title="Показать занятия">▾</button>
+            <button type="button" class="btn-icon" data-student="${student.id}" title="Открыть ученика">›</button>
           </div>
-          ${lessons}
+          <div class="unpaid-lessons"${expanded ? "" : " hidden"}>${lessons}</div>
         </div>`;
       }).join("")
     : `<div class="card empty">Нет неоплаченных занятий</div>`;
@@ -649,6 +655,29 @@ async function renderPayments() {
       paymentsTab = el.dataset.paytab;
       render();
     };
+  });
+  document.querySelectorAll("[data-unpaid-toggle]").forEach((el) => {
+    el.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleUnpaidStudent(el.dataset.unpaidToggle);
+    };
+  });
+}
+
+function toggleUnpaidStudent(studentId) {
+  const id = String(studentId || "");
+  if (!id) return;
+  if (paymentsExpanded.has(id)) paymentsExpanded.delete(id);
+  else paymentsExpanded.add(id);
+  const expanded = paymentsExpanded.has(id);
+  const card = document.querySelector(`[data-unpaid-card="${id}"]`);
+  if (!card) return;
+  card.classList.toggle("expanded", expanded);
+  const lessons = card.querySelector(".unpaid-lessons");
+  if (lessons) lessons.hidden = !expanded;
+  card.querySelectorAll("[data-unpaid-toggle]").forEach((btn) => {
+    btn.setAttribute("aria-expanded", expanded ? "true" : "false");
   });
 }
 

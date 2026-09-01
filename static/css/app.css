@@ -128,7 +128,11 @@ label { display: grid; gap: 6px; font-size: 13px; font-weight: 600; color: var(-
 .amount-paid { color: var(--indigo); font-weight: 800; }
 .unpaid-card { display: grid; gap: 4px; }
 .unpaid-student { align-items: center; }
+.unpaid-student-main { flex: 1; min-width: 0; }
 .unpaid-student-info { flex: 1; min-width: 0; }
+.unpaid-toggle { transition: transform .15s ease; }
+.unpaid-card.expanded .unpaid-toggle { transform: rotate(180deg); }
+.unpaid-lessons[hidden] { display: none; }
 .unpaid-lesson {
   display: flex;
   justify-content: space-between;
