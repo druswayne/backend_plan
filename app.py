@@ -543,20 +543,31 @@ def api_telegram_backup():
             pass
 
 
-def create_app() -> Flask:
-    database.init_db()
-    plan_database.init_db()
+def _start_background_jobs() -> None:
     telegram_jobs.start_scheduler()
     plan_telegram_jobs.start_scheduler()
+
+
+def create_app(start_jobs: bool = True) -> Flask:
+    database.init_db()
+    plan_database.init_db()
+    if start_jobs:
+        _start_background_jobs()
     return app
 
 
 if __name__ == "__main__":
-    debug = True
-    # Reloader-родитель не должен держать SQLite, иначе замена файла базы не сработает.
-    if os.environ.get("WERKZEUG_RUN_MAIN") == "true" or not debug:
+    # Reloader в debug создаёт 2 процесса — планировщик только в дочернем.
+    debug = os.environ.get("FLASK_DEBUG", "1") == "1"
+    is_reloader_child = os.environ.get("WERKZEUG_RUN_MAIN") == "true"
+    should_run_jobs = is_reloader_child or not debug
+    if should_run_jobs:
         database.init_db()
         plan_database.init_db()
-        telegram_jobs.start_scheduler()
-        plan_telegram_jobs.start_scheduler()
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "5000")), debug=debug)
+        _start_background_jobs()
+    app.run(
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", "5000")),
+        debug=debug,
+        use_reloader=debug,
+    )
