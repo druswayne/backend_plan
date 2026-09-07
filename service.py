@@ -704,6 +704,15 @@ def change_subject(occurrence_id: int, subject_id: int, apply_to_future: bool = 
             _rebalance_payments(conn, occ["studentId"])
 
 
+def _next_date_for_weekday(day_of_week: int, from_date: date) -> date:
+    current = from_date
+    for _ in range(7):
+        if weekday_number(current) == day_of_week:
+            return current
+        current += timedelta(days=1)
+    return from_date
+
+
 def update_series_future(series_id: int, payload: dict) -> None:
     with db_cursor(transaction=True) as conn:
         series = as_dict(conn.execute("SELECT * FROM lesson_series WHERE id = ?", (series_id,)).fetchone())
@@ -714,22 +723,23 @@ def update_series_future(series_id: int, payload: dict) -> None:
         location = payload.get("locationType") or series["locationType"]
         address = (payload.get("address") or "").strip() or None
         reminder = payload.get("reminderMinutes")
-        dow = int(payload.get("dayOfWeek") or series["dayOfWeek"])
-        conn.execute(
-            """
-            UPDATE lesson_series
-            SET dayOfWeek = ?, startTimeMinutes = ?, durationMinutes = ?,
-                locationType = ?, address = ?, reminderMinutes = ?
-            WHERE id = ?
-            """,
-            (dow, start_time, duration, location, address, reminder, series_id),
-        )
+        old_dow = int(series["dayOfWeek"])
+        if payload.get("dayOfWeek") is None:
+            dow = old_dow
+        else:
+            dow = int(payload["dayOfWeek"])
+        if dow not in range(1, 8):
+            raise AppError("Некорректный день недели")
+        delta = (dow - old_dow) % 7
+
+        updates = []
         for row in conn.execute("SELECT * FROM lesson_occurrences WHERE seriesId = ?", (series_id,)):
             if row["status"] != STATUS_EXPECTED:
                 continue
             updated = dict(row)
             updated.update(
                 {
+                    "dateEpochDay": int(row["dateEpochDay"]) + delta,
                     "startTimeMinutes": start_time,
                     "durationMinutes": duration,
                     "locationType": location,
@@ -737,15 +747,58 @@ def update_series_future(series_id: int, payload: dict) -> None:
                     "reminderMinutes": reminder,
                 }
             )
-            _ensure_no_conflict(updated, _active_others(conn, updated["dateEpochDay"], updated["id"]))
+            updates.append(updated)
+
+        moving_ids = {item["id"] for item in updates}
+        for updated in updates:
+            db_others = [
+                other
+                for other in _active_others(conn, updated["dateEpochDay"], updated["id"])
+                if other["id"] not in moving_ids
+            ]
+            siblings = [other for other in updates if other["id"] != updated["id"]]
+            _ensure_no_conflict(updated, db_others + siblings)
+
+        for updated in updates:
             conn.execute(
                 """
                 UPDATE lesson_occurrences
-                SET startTimeMinutes = ?, durationMinutes = ?, locationType = ?, address = ?, reminderMinutes = ?
+                SET dateEpochDay = ?, startTimeMinutes = ?, durationMinutes = ?,
+                    locationType = ?, address = ?, reminderMinutes = ?
                 WHERE id = ?
                 """,
-                (start_time, duration, location, address, reminder, row["id"]),
+                (
+                    updated["dateEpochDay"],
+                    start_time,
+                    duration,
+                    location,
+                    address,
+                    reminder,
+                    updated["id"],
+                ),
             )
+
+        new_end = int(series["endDateEpochDay"])
+        if updates:
+            new_end = max(new_end, max(item["dateEpochDay"] for item in updates))
+
+        new_single = series["singleDateEpochDay"]
+        if delta:
+            if updates:
+                new_single = min(item["dateEpochDay"] for item in updates)
+            else:
+                new_single = to_epoch_day(_next_date_for_weekday(dow, today()))
+
+        conn.execute(
+            """
+            UPDATE lesson_series
+            SET dayOfWeek = ?, startTimeMinutes = ?, durationMinutes = ?,
+                locationType = ?, address = ?, reminderMinutes = ?,
+                endDateEpochDay = ?, singleDateEpochDay = ?
+            WHERE id = ?
+            """,
+            (dow, start_time, duration, location, address, reminder, new_end, new_single, series_id),
+        )
 
 
 def extend_series(series_id: int, new_end_iso: str) -> None:
