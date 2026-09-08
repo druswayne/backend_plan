@@ -62,33 +62,6 @@ def send_text(token: str, chat_id: str, text: str) -> int | None:
     return int(message_id) if message_id else None
 
 
-def edit_text(token: str, chat_id: str, message_id: int, text: str) -> bool:
-    if not token or not chat_id or not message_id:
-        return False
-    payload = json.dumps(
-        {
-            "chat_id": chat_id,
-            "message_id": message_id,
-            "text": (text or "")[:4096],
-            "parse_mode": "HTML",
-            "disable_web_page_preview": True,
-        }
-    ).encode("utf-8")
-    try:
-        _request(
-            f"https://api.telegram.org/bot{token}/editMessageText",
-            payload,
-            {"Content-Type": "application/json; charset=utf-8"},
-            timeout=20,
-        )
-        return True
-    except service.AppError as exc:
-        # «message is not modified» — уже актуальное сообщение, считаем успехом.
-        if "message is not modified" in str(exc.message or "").lower():
-            return True
-        return False
-
-
 def send_document(token: str, chat_id: str, filename: str, content: bytes, caption: str = "") -> int | None:
     if not token or not chat_id:
         raise service.AppError("Укажите токен бота и chat id")
@@ -254,22 +227,16 @@ def _unmark_chat_sent(state: dict, chat_id: str, today: str) -> None:
 
 
 def _deliver_to_chat(token: str, chat_id: str, html: str, previous_ids: list[int]) -> list[int]:
-    """Обновляет существующее сообщение или шлёт одно новое и чистит старые."""
-    keep_id: int | None = None
-    for old_id in reversed(previous_ids):
-        if edit_text(token, chat_id, old_id, html):
-            keep_id = old_id
-            break
-    if keep_id is None:
-        keep_id = send_text(token, chat_id, html)
+    """Всегда шлёт новое сообщение (чтобы пришло уведомление), затем удаляет старые."""
+    new_id = send_text(token, chat_id, html)
     kept: list[int] = []
     for old_id in previous_ids:
-        if keep_id and old_id == keep_id:
+        if new_id and old_id == new_id:
             continue
         if not delete_message(token, chat_id, old_id):
             kept.append(old_id)
-    if keep_id:
-        kept.append(keep_id)
+    if new_id:
+        kept.append(new_id)
     return kept
 
 
@@ -321,7 +288,7 @@ def _send_daily_schedule(test: bool = False) -> dict:
                 state["messages"] = messages
                 _save_state(state)
                 sent_by_chat = _normalize_sent_by_chat(state["sentByChat"])
-            errors.append(f"{normalized}: {exc.message}")
+            errors.append(f"{normalized}: {_friendly_telegram_error(exc.message)}")
             continue
 
         messages[normalized] = kept
@@ -358,6 +325,14 @@ def _send_daily_schedule(test: bool = False) -> dict:
         state["lastRetryAt"] = None
     _save_state(state)
     return {"ok": True, "test": test, "recipients": len(recipients), "sentNow": sent_now}
+
+
+def _friendly_telegram_error(message: str | None) -> str:
+    text = str(message or "").strip() or "ошибка Telegram"
+    low = text.lower()
+    if "unauthorized" in low or "401" in low:
+        return "токен бота недействителен — сохраните новый токен в настройках"
+    return text
 
 
 def status() -> dict:

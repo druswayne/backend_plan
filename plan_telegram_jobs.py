@@ -61,32 +61,6 @@ def send_text(token: str, chat_id: str, text: str) -> int | None:
     return int(message_id) if message_id else None
 
 
-def edit_text(token: str, chat_id: str, message_id: int, text: str) -> bool:
-    if not token or not chat_id or not message_id:
-        return False
-    payload = json.dumps(
-        {
-            "chat_id": chat_id,
-            "message_id": message_id,
-            "text": (text or "")[:4096],
-            "parse_mode": "HTML",
-            "disable_web_page_preview": True,
-        }
-    ).encode("utf-8")
-    try:
-        _request(
-            f"https://api.telegram.org/bot{token}/editMessageText",
-            payload,
-            {"Content-Type": "application/json; charset=utf-8"},
-            timeout=20,
-        )
-        return True
-    except plan_service.PlanError as exc:
-        if "message is not modified" in str(exc.message or "").lower():
-            return True
-        return False
-
-
 def delete_message(token: str, chat_id: str, message_id: int) -> bool:
     payload = json.dumps({"chat_id": chat_id, "message_id": message_id}).encode("utf-8")
     try:
@@ -156,21 +130,16 @@ def _should_retry(state: dict, now: datetime) -> bool:
 
 
 def _deliver_to_chat(token: str, chat_id: str, html: str, previous_ids: list[int]) -> list[int]:
-    keep_id: int | None = None
-    for old_id in reversed(previous_ids):
-        if edit_text(token, chat_id, old_id, html):
-            keep_id = old_id
-            break
-    if keep_id is None:
-        keep_id = send_text(token, chat_id, html)
+    """Всегда шлёт новое сообщение, затем удаляет старые."""
+    new_id = send_text(token, chat_id, html)
     kept: list[int] = []
     for old_id in previous_ids:
-        if keep_id and old_id == keep_id:
+        if new_id and old_id == new_id:
             continue
         if not delete_message(token, chat_id, old_id):
             kept.append(old_id)
-    if keep_id:
-        kept.append(keep_id)
+    if new_id:
+        kept.append(new_id)
     return kept
 
 
